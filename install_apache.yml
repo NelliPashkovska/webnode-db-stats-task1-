@@ -1,0 +1,91 @@
+---
+- hosts: wordpress-nodes
+  become: yes
+  vars:
+    wordpress_path: /var/www/wordpress
+  tasks:
+    - name: "Install apache server"
+      yum:
+        name: httpd
+        state: latest
+    - name: "install php"
+      yum:
+        name: "{{packages}}"
+        state: latest
+      vars:
+        packages:
+         - php
+         - php-mysql
+         - MySQL-python
+    - name: "Download worpress"
+      get_url:
+        url: https://wordpress.org/latest.zip
+        dest: /tmp/wordpress.zip
+    - name: "Unarchive wordpress"
+      unarchive:
+        src: /tmp/wordpress.zip
+        dest: /var/www
+        remote_src: yes
+    - name: "Start service httpd, if not started"
+      service:
+        name: httpd
+        state: restarted
+
+- hosts: DB-nodes
+  become: yes
+  tasks:
+    - name: "install mysqls"
+      yum:
+        name: "{{packages}}"
+        state: present
+      vars:
+        packages:
+         - mariadb
+         - mariadb-server
+         - MySQL-python
+    - name: "Start service mariadb, if not started"
+      service:
+        name: mariadb
+        state: started
+    - name: "Create new database"
+      mysql_db:
+        name: hello_db
+        state: present
+
+- hosts: telegraf
+  become: yes
+  vars:
+    telegraf_url: https://dl.influxdata.com/telegraf/releases/telegraf-1.8.3-1.x86_64.rpm
+    metrics_storage_ip: 172.31.23.220
+  tasks:
+    - name: "Install telegraf"
+      yum:
+        name: "{{telegraf_url}}"
+        state: present
+    - template:
+        src: templates/telegraf.conf
+        dest: /etc/telegraf/telegraf.conf
+    - service:
+        name: telegraf
+        state: restarted
+        
+- hosts: stats-nodes
+  become: yes
+  vars:
+    grafana_url: https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-5.3.4-1.x86_64.rpm
+    influxdb_url: https://dl.influxdata.com/influxdb/releases/influxdb-1.7.1.x86_64.rpm
+  tasks:
+    - name: "Install influxdb"
+      yum:
+        name: "{{influxdb_url}}"
+        state: present
+    - service:
+        name: influxdb
+        state: restarted
+    - name: "Install grafana"
+      yum:
+        name: "{{grafana_url}}"
+        state: present
+    - service:
+        name: grafana-server
+        state: restarted

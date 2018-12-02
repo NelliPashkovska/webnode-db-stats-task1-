@@ -1,0 +1,20 @@
+---
+- hosts: DB-nodes
+  become: yes
+  tasks:
+    - name: "install mysqls"
+      yum:
+        name: "{{packages}}"
+        state: present
+      vars:
+        packages:
+         - mariadb
+         - mariadb-server
+    - name: "Start service mariadb, if not started"
+      service:
+        name: mariadb
+        state: started
+    - name: "Create new database"
+      mysql_db:
+        name: hello_db
+        state: present
